@@ -8,13 +8,14 @@ parser = AP.many' (AP.decimal <* AP.choice [AP.endOfLine, AP.endOfInput])
 
 naiveFuelRequirement :: Integer -> Integer
 naiveFuelRequirement n 
-  | n <= 6 = 0
-  | n  > 6  = (n `div` 3) - 2
+  | n <= 6     = 0
+  | otherwise  = (n `div` 3) - 2
 
 completeFuelRequirement :: Integer -> Integer
 completeFuelRequirement 0 = 0
-completeFuelRequirement n = f + completeFuelRequirement f
-  where f = naiveFuelRequirement n  
+completeFuelRequirement m =
+  let fuel = naiveFuelRequirement m
+  in  fuel + completeFuelRequirement fuel
 
 calculate :: (Integer -> Integer) -> [ Integer ] -> Integer
 calculate calculator input = sum (calculator <$> input)
