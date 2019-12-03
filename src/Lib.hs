@@ -4,7 +4,8 @@ module Lib
     , runFile'
     ) where
 
-import Data.Attoparsec.ByteString.Char8 as AP
+import qualified Data.Attoparsec.ByteString.Char8 as AP
+
 import System.IO (openFile, IOMode(..))
 import Data.ByteString (hGetContents)
 import Data.Monoid (Sum(..))

@@ -1,6 +1,7 @@
 module Day01 where
 
-import Data.Attoparsec.ByteString.Char8 as AP
+import qualified Data.Attoparsec.ByteString.Char8 as AP
+
 import Lib (runFile')
 
 parser :: AP.Parser [ Integer ]

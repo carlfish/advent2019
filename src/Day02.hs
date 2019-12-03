@@ -2,7 +2,8 @@
 
 module Day02 where
 
-import Data.Attoparsec.ByteString.Char8 as AP
+import qualified Data.Attoparsec.ByteString.Char8 as AP
+
 import Lib (runFile, runFile')
 import Data.List (find)
 import Data.Array
@@ -69,7 +70,7 @@ runInterpreter = do
   case ps of
     Reading    -> readNext >>= interpret >> runInterpreter
     Running op -> run op >> runInterpreter
-    Stopped    -> gets (\(_, h, _) -> Right (h ! a0))
+    Stopped    -> Right <$> readHeap a0
     Failed e   -> return (Left e)
   
 runList :: Program() -> [ Int ] -> Either String Int
