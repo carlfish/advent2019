@@ -36,22 +36,17 @@ move1 R (GridRef x y) = GridRef (x + 1) y
 unrollWire :: [ Offset ] -> [ GridRef ]
 unrollWire =
   let
-    nextMove gs (Offset _ 0)        = gs
-    nextMove (g : gs) (Offset d i)  =
-      let nextg = move1 d g 
-      in nextMove (nextg : g : gs) (Offset d (i - 1)) 
+    nextMove gs       (Offset _ 0)  = gs
+    nextMove (g : gs) (Offset d i)  = nextMove (move1 d g  : g : gs) (Offset d (i - 1)) 
   in
     reverse . (foldl nextMove [ origin ])
 
-intersections :: [ Offset ] -> [ Offset ] -> [ GridRef ]
-intersections a b = fastIntersect (unrollWire a) (unrollWire b)
-
 closest :: (GridRef -> Int) -> [ GridRef ] -> GridRef
-closest f = 
+closest distance = 
   let 
     closer (GridRef 0 0) g = g
     closer g (GridRef 0 0) = g
-    closer g1 g2 = if (f g1 < f g2) then g1 else g2
+    closer g1 g2 = if (distance g1 < distance g2) then g1 else g2
   in 
     foldl closer origin
 
