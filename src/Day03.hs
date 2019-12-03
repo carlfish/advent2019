@@ -4,6 +4,7 @@ import qualified Data.Attoparsec.ByteString.Char8 as AP
 
 import Data.List (sort, elemIndex, reverse)
 import Lib (runFile')
+import Data.Set (intersection, fromList, Set)
 import Data.Maybe (fromMaybe)
 
 data GridRef = GridRef { x :: Int, y :: Int } 
@@ -27,43 +28,35 @@ traverseDistance w1 w2 g = fromMaybe maxBound pathSum
       w2idx <- elemIndex g w2
       return (w1idx + w2idx)
 
-move1 :: Direction -> GridRef -> GridRef
-move1 U (GridRef x y) = GridRef x (y + 1)
-move1 D (GridRef x y) = GridRef x (y - 1)
-move1 L (GridRef x y) = GridRef (x - 1) y
-move1 R (GridRef x y) = GridRef (x + 1) y
+move :: GridRef -> Direction -> GridRef
+move (GridRef x y) U = GridRef x (y + 1)
+move (GridRef x y) D = GridRef x (y - 1)
+move (GridRef x y) L = GridRef (x - 1) y
+move (GridRef x y) R = GridRef (x + 1) y
 
 unrollWire :: [ Offset ] -> [ GridRef ]
-unrollWire =
+unrollWire os =
   let
-    nextMove gs       (Offset _ 0)  = gs
-    nextMove (g : gs) (Offset d i)  = nextMove (move1 d g  : g : gs) (Offset d (i - 1)) 
+    toDirections (Offset d i) = replicate i d
   in
-    reverse . (foldl nextMove [ origin ])
+    scanl move origin (concatMap toDirections os)
 
-closest :: (GridRef -> Int) -> [ GridRef ] -> GridRef
-closest distance = 
+closestBy :: Foldable f => (GridRef -> Int) -> f GridRef -> GridRef
+closestBy distanceTo = 
   let 
-    closer (GridRef 0 0) g = g
-    closer g (GridRef 0 0) = g
-    closer g1 g2 = if (distance g1 < distance g2) then g1 else g2
+    closer x y = 
+      if      (x == origin)                 then y
+      else if (y == origin)                 then x
+      else if (distanceTo x < distanceTo y) then x
+      else                                       y
   in 
     foldl closer origin
 
--- n(logn) intersection
-fastIntersect :: Ord a => [ a ] -> [ a ] -> [ a ]
-fastIntersect x y = 
-  let 
-    sx = sort x
-    sy = sort y
-    is ss as [] = ss
-    is ss [] bs = ss
-    is ss (a : as) (b : bs) =
-      if      (a == b) then is (a : ss) as bs
-      else if (a < b)  then is ss as (b : bs)
-      else                  is ss (a : as) bs
-  in
-    is [] sx sy
+setIntersect :: Ord a => [ a ] -> [ a ] -> Set a
+setIntersect x y = intersection (fromList x) (fromList y)
+
+distanceToClosestIntersection :: (GridRef -> Int) -> [ GridRef ] -> [ GridRef ] -> Int
+distanceToClosestIntersection distanceTo g1 g2 = distanceTo (closestBy distanceTo (setIntersect g1 g2))
 
 -- Run the exercises
 
@@ -71,10 +64,10 @@ runEx :: ( [ GridRef ] -> [ GridRef ] -> Int ) -> IO (Either String Int)
 runEx f = runFile' "data/day03/0301.txt" parser (\(gs1, gs2) -> f (unrollWire gs1) (unrollWire gs2))
 
 ex1 :: IO (Either String Int)
-ex1 = runEx (\gs1 gs2 -> (taxiDistance origin (closest (taxiDistance origin) (fastIntersect gs1 gs2))))
+ex1 = runEx (distanceToClosestIntersection (taxiDistance origin))
 
 ex2 :: IO (Either String Int)
-ex2 = runEx (\gs1 gs2 -> (traverseDistance gs1 gs2 (closest (traverseDistance gs1 gs2) (fastIntersect gs1 gs2))))
+ex2 = runEx (\g1 g2 -> distanceToClosestIntersection (traverseDistance g1 g2) g1 g2)
 
 -- Input Parser
 
