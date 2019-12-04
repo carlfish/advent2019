@@ -1,5 +1,7 @@
 module Day04 where
 
+import Data.List (any, all)
+
 input :: [ Int ]
 input = [246540 .. 787419]
 
@@ -7,11 +9,11 @@ digits :: Int -> [ Int ]
 digits = reverse . digits'
   where
     digits' 0 = [] 
-    digits' xs = xs `mod` 10 : digits' (xs `div` 10)
+    digits' i = i `mod` 10 : digits' (i `div` 10)
 
 zip4 :: [ a ] -> [ b ] -> [ c ] -> [ d ] -> [ (a, b, c, d) ]
 zip4 (a:as) (b:bs) (c:cs) (d:ds) = (a, b, c, d) : zip4 as bs cs ds
-zip4 _ _ _ _ = []
+zip4  _      _      _      _     = []
 
 pairs :: [ Int ] -> [ (Int, Int) ]
 pairs xs = zip xs (tail xs)
@@ -21,13 +23,13 @@ paddedQuads xs = zip4 pxs (tail pxs) (tail . tail $ pxs) (tail . tail . tail $ p
     where pxs = 0 : xs ++ [ 99 ]
 
 increasing :: [ (Int, Int) ] -> Bool
-increasing = foldl (\v (x, y) -> v && x <= y) True
+increasing = all (\(x, y) -> x <= y)
 
 paired :: [ (Int, Int) ] -> Bool
-paired = foldl (\v (x, y) -> v || x == y) False
+paired = any (\(x, y) -> x == y)
 
 onlyPaired :: [ (Int, Int, Int, Int) ] -> Bool
-onlyPaired = foldl (\v (a, b, c, d) -> v || (b == c && a /= c && d /= c)) False
+onlyPaired = any (\(a, b, c, d) -> b == c && a /= c && d /= c)
 
 ex1 :: Int
 ex1 = length ((filter increasing . filter paired) (pairs <$> digits <$> input))
