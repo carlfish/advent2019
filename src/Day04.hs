@@ -20,7 +20,7 @@ pairs xs = zip xs (tail xs)
 
 paddedQuads :: [ Int ] -> [ (Int, Int, Int, Int) ]
 paddedQuads xs = zip4 pxs (tail pxs) (tail . tail $ pxs) (tail . tail . tail $ pxs)
-    where pxs = 0 : xs ++ [ 99 ]
+    where pxs = -99 : xs ++ [ 99 ]
 
 increasing :: [ (Int, Int) ] -> Bool
 increasing = all (\(x, y) -> x <= y)
