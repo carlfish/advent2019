@@ -34,6 +34,8 @@ move (GridRef x y) D = GridRef x (y - 1)
 move (GridRef x y) L = GridRef (x - 1) y
 move (GridRef x y) R = GridRef (x + 1) y
 
+-- scanl is "fold, but return a list of every step of that fold instead of just the final result",
+-- so 'scanl (+) 1 [ 2, 3, 4]' would be `[1, 3, 6, 10]`.
 unrollWire :: [ Offset ] -> [ GridRef ]
 unrollWire os =
   let
@@ -61,7 +63,7 @@ distanceToClosestIntersection distanceTo g1 g2 = distanceTo (closestBy distanceT
 -- Run the exercises
 
 runEx :: ( [ GridRef ] -> [ GridRef ] -> Int ) -> IO (Either String Int)
-runEx f = runFile' "data/day03/0301.txt" parser (\(gs1, gs2) -> f (unrollWire gs1) (unrollWire gs2))
+runEx f = runFile' "data/day03/0301.txt" parser (\(os1, os2) -> f (unrollWire os1) (unrollWire os2))
 
 ex1 :: IO (Either String Int)
 ex1 = runEx (distanceToClosestIntersection (taxiDistance origin))
