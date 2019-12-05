@@ -135,18 +135,18 @@ interpret opcode =
     intToParam3 p1 p2 f = \x y z -> f (p1 x) (p2 y) (Addr z)
     intToParam2 p1 p2 f = \x y -> f (p1 x) (p2 y)
     running op   = setPS (Running op)
-  in do
+  in running =<< do
     (p1, p2, _, code) <- parseOpcode opcode
     case code of
-      1  -> running =<< readNext3 (intToParam3 p1 p2 Sum)
-      2  -> running =<< readNext3 (intToParam3 p1 p2 Mul)
-      3  -> running =<< ReadIn <$> Addr <$> readNext
-      4  -> running =<< WriteOut <$> p1 <$> readNext
-      5  -> running =<< readNext2 (intToParam2 p1 p2 JumpIfTrue)
-      6  -> running =<< readNext2 (intToParam2 p1 p2 JumpIfFalse)
-      7  -> running =<< readNext3 (intToParam3 p1 p2 LessThan)
-      8  -> running =<< readNext3 (intToParam3 p1 p2 Equals)
-      99 -> running Halt
+      1  -> readNext3 (intToParam3 p1 p2 Sum)
+      2  -> readNext3 (intToParam3 p1 p2 Mul)
+      3  -> ReadIn <$> Addr <$> readNext
+      4  -> WriteOut <$> p1 <$> readNext
+      5  -> readNext2 (intToParam2 p1 p2 JumpIfTrue)
+      6  -> readNext2 (intToParam2 p1 p2 JumpIfFalse)
+      7  -> readNext3 (intToParam3 p1 p2 LessThan)
+      8  -> readNext3 (intToParam3 p1 p2 Equals)
+      99 -> return Halt
       i  -> throwError ("Unknown opcode: " <> (show i))
 
 runInterpreter :: Program Int
