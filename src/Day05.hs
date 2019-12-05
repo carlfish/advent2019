@@ -17,7 +17,7 @@ import Control.Monad.RWS hiding (Sum)
 type Heap = Array Addr Int 
 type RuntimeState = (ProgramState, Heap, Addr)
 type Program = RWST Int (Seq Int, Seq String) RuntimeState (Either String)
-type IntToParam = Int -> Param
+type ParamReader = Int -> Param
 
 newtype Addr = Addr Int deriving (Show, Eq, Ord, Ix)
 
@@ -111,7 +111,7 @@ run op = trace op >> run' >> setPS (nextState op)
       Equals p1 p2 a   -> branchOn (isEq p1 p2) (writeHeap a 1) (writeHeap a 0)
       Halt             -> noOp
 
-parseOpcode :: MonadError String m => Int -> m (IntToParam, IntToParam, IntToParam, Int)
+parseOpcode :: MonadError String m => Int -> m (ParamReader, ParamReader, ParamReader, Int)
 parseOpcode opcode = 
   let
     parseParam 0 = return (Ref . Addr)
