@@ -134,7 +134,7 @@ interpret opcode =
     readNext2 f  = f <$> readNext <*> readNext
     intToParam3 p1 p2 f = \x y z -> f (p1 x) (p2 y) (Addr z)
     intToParam2 p1 p2 f = \x y -> f (p1 x) (p2 y)
-  in setPS . Running =<< do
+  in (setPS . Running) =<< do
     (p1, p2, _, code) <- parseOpcode opcode
     case code of
       1  -> readNext3 (intToParam3 p1 p2 Sum)
