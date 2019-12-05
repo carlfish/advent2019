@@ -84,8 +84,8 @@ readNext = state (\(ps, h, c) -> (h ! c, (ps, h, incAddr c)))
 binaryOp :: (Int -> Int -> Int) -> Param -> Param -> Addr -> Program ()
 binaryOp f ia ib io = writeHeap io =<< (f <$> readParam ia <*> readParam ib)
 
-branchOn :: Program Bool -> Program a -> Program a -> Program a
-branchOn c t f = c >>= (\b -> if b then t else f)
+branch :: a -> a -> Bool -> a
+branch ifTrue ifFalse condition = if condition then ifTrue else ifFalse
 
 test :: (Int -> Bool) -> Param -> Program Bool
 test f p = f <$> readParam p
@@ -105,10 +105,10 @@ run op = trace op >> run' >> setPS (nextState op)
       Mul ia ib io     -> binaryOp (*) ia ib io                      
       ReadIn a         -> ask >>= writeHeap a                           
       WriteOut a       -> readParam a >>= output                         
-      JumpIfTrue p a   -> branchOn (test (/= 0) p) (setCounter a) noOp
-      JumpIfFalse p a  -> branchOn (test (== 0) p) (setCounter a) noOp
-      LessThan p1 p2 a -> branchOn (isLt p1 p2) (writeHeap a 1) (writeHeap a 0)
-      Equals p1 p2 a   -> branchOn (isEq p1 p2) (writeHeap a 1) (writeHeap a 0)
+      JumpIfTrue p a   -> (test (/= 0) p) >>= branch (setCounter a) noOp
+      JumpIfFalse p a  -> (test (== 0) p) >>= branch (setCounter a) noOp
+      LessThan p1 p2 a -> (isLt p1 p2) >>= branch (writeHeap a 1) (writeHeap a 0)
+      Equals p1 p2 a   -> (isEq p1 p2) >>= branch (writeHeap a 1) (writeHeap a 0)
       Halt             -> noOp
 
 parseOpcode :: MonadError String m => Int -> m (ParamReader, ParamReader, ParamReader, Int)
