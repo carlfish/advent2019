@@ -62,8 +62,11 @@ output i = tell (singleton i, empty)
 trace :: Show a => a -> Program ()
 trace a = if debug then tell (empty, singleton (show a)) else noOp
 
-setCounter :: Param -> Program ()
-setCounter p = readParam p >>= (\a -> modify (\(ps, h, _) -> (ps, h , (Addr a))))
+setProgramCounter :: Addr -> Program ()
+setProgramCounter a = modify (\(ps, h, _) -> (ps, h , a))
+
+setProgramCounterFrom :: Param -> Program()
+setProgramCounterFrom p = setProgramCounter =<< (Addr <$> readParam p)
 
 setPS :: ProgramState -> Program ()
 setPS ps = modify (\(_, h, c) -> (ps, h, c))
@@ -103,12 +106,12 @@ run op = trace op >> run' >> setPS (nextState op)
     run' = case op of 
       Sum ia ib io     -> binaryOp (+) ia ib io
       Mul ia ib io     -> binaryOp (*) ia ib io                      
-      ReadIn a         -> ask >>= writeHeap a                           
-      WriteOut a       -> readParam a >>= output                         
-      JumpIfTrue p a   -> (test (/= 0) p) >>= branch (setCounter a) noOp
-      JumpIfFalse p a  -> (test (== 0) p) >>= branch (setCounter a) noOp
-      LessThan p1 p2 a -> (isLt p1 p2) >>= branch (writeHeap a 1) (writeHeap a 0)
-      Equals p1 p2 a   -> (isEq p1 p2) >>= branch (writeHeap a 1) (writeHeap a 0)
+      ReadIn a         -> writeHeap a =<< ask
+      WriteOut a       -> output =<< readParam a                       
+      JumpIfTrue p a   -> branch (setProgramCounterFrom a) noOp  =<< test (/= 0) p
+      JumpIfFalse p a  -> branch (setProgramCounterFrom a) noOp  =<< test (== 0) p
+      LessThan p1 p2 a -> branch (writeHeap a 1) (writeHeap a 0) =<< isLt p1 p2
+      Equals p1 p2 a   -> branch (writeHeap a 1) (writeHeap a 0) =<< isEq p1 p2
       Halt             -> noOp
 
 parseOpcode :: MonadError String m => Int -> m (ParamReader, ParamReader, ParamReader, Int)
