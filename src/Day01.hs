@@ -12,6 +12,8 @@ naiveFuelRequirement n
   | n <= 6     = 0
   | otherwise  = (n `div` 3) - 2
 
+-- You could also do `sum . (takeWhile (>0)) . tail . (iterate naiveFuelRequirement)` here,
+-- but IMO that would be trading more work for less clarity.
 completeFuelRequirement :: Integer -> Integer
 completeFuelRequirement 0 = 0
 completeFuelRequirement m =

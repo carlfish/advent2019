@@ -1,5 +1,3 @@
-{- GeneralizedNewtypeDeriving -}
-
 module Day02 where
 
 import qualified Data.Attoparsec.ByteString.Char8 as AP
