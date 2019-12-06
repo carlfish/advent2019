@@ -5,8 +5,7 @@ import qualified Data.Attoparsec.ByteString.Char8 as AP
 import Lib (runFile')
 import Prelude hiding (lookup)
 import Data.Map (Map(..), lookup, keys, fromList)
-import qualified Data.Map as Map
-import Data.Maybe
+import Data.Maybe (maybe)
 
 newtype Obj = Obj String
   deriving (Eq, Ord, Show)
