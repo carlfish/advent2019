@@ -2,10 +2,10 @@ module Day01 where
 
 import qualified Data.Attoparsec.ByteString.Char8 as AP
 
-import Lib (runFile')
+import Lib (runFile', onePerLine)
 
 parser :: AP.Parser [ Integer ]
-parser = AP.many' (AP.decimal <* AP.choice [AP.endOfLine, AP.endOfInput])
+parser = onePerLine AP.decimal
 
 naiveFuelRequirement :: Integer -> Integer
 naiveFuelRequirement n 

@@ -3,7 +3,7 @@ module Day03 where
 import qualified Data.Attoparsec.ByteString.Char8 as AP
 
 import Data.List (sort, elemIndex, reverse)
-import Lib (runFile')
+import Lib (runFile', commaSeparated)
 import Data.Set (intersection, fromList, Set)
 import Data.Maybe (fromMaybe)
 
@@ -77,7 +77,7 @@ parser :: AP.Parser ([ Offset ], [ Offset ])
 parser = (,) <$> (offsets <* AP.endOfLine) <*> (offsets <* AP.endOfInput)
 
 offsets :: AP.Parser [ Offset ]
-offsets = AP.sepBy offset (AP.char ',')
+offsets = commaSeparated offset
 
 offset :: AP.Parser Offset
 offset = Offset <$> direction <*> AP.decimal

@@ -4,7 +4,7 @@ module Day05 where
 
 import qualified Data.Attoparsec.ByteString.Char8 as AP
 
-import Lib (runFile, runFile')
+import Lib (runFile, commaSeparated)
 import Data.List (find)
 import Data.Array
 import Data.Sequence hiding (length)
@@ -168,4 +168,4 @@ ex2 :: IO (Either String (Seq Int, Seq String))
 ex2 = runFile "data/day05/0501.txt" parser (runList 5)
 
 parser :: AP.Parser [ Int ]
-parser = AP.sepBy (AP.signed AP.decimal) (AP.char ',')
+parser = commaSeparated (AP.signed AP.decimal)

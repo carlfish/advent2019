@@ -2,7 +2,7 @@ module Day06 where
 
 import qualified Data.Attoparsec.ByteString.Char8 as AP
 
-import Lib (runFile')
+import Lib (runFile', onePerLine)
 import Prelude hiding (lookup)
 import Data.Map (Map(..), lookup, keys, fromList)
 import Data.Maybe (maybe)
@@ -47,7 +47,7 @@ distanceBetween from to os = length (pathBetween from to os) - 1
 -- Run the exercises
 
 runEx :: String -> (Orbits -> a) -> IO (Either String a) 
-runEx file f = runFile' file parser (f . orbits)
+runEx file f = runFile' file parser f
 
 ex1 :: IO (Either String Int)
 ex1 = runEx "data/day06/0601.txt" allOrbits
@@ -69,5 +69,5 @@ pObj = Obj <$> (AP.many1' (AP.choice [ AP.digit, AP.letter_ascii ]))
 pOrbit :: AP.Parser (Obj, Obj)
 pOrbit = (flip (,)) <$> pObj <*> (AP.char ')' *> pObj)
 
-parser :: AP.Parser [ (Obj, Obj) ]
-parser = AP.many' (pOrbit <* AP.choice [AP.endOfLine, AP.endOfInput])
+parser :: AP.Parser Orbits
+parser = fromList <$> (onePerLine pOrbit)

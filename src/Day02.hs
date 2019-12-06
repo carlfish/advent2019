@@ -2,7 +2,7 @@ module Day02 where
 
 import qualified Data.Attoparsec.ByteString.Char8 as AP
 
-import Lib (runFile, runFile')
+import Lib (runFile, runFile', commaSeparated)
 import Data.List (find)
 import Data.Array
 import Control.Monad.State
@@ -96,4 +96,4 @@ ex2 :: IO (Either String (Maybe (Int, Int)))
 ex2 = runFile' "data/day02/0201.txt" parser (runPossibilities 19690720)
 
 parser :: AP.Parser [ Int ]
-parser = AP.sepBy AP.decimal (AP.char ',')
+parser = commaSeparated AP.decimal
