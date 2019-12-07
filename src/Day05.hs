@@ -7,22 +7,18 @@ import qualified Data.Attoparsec.ByteString.Char8 as AP
 import Lib (runFile, commaSeparated)
 import Data.List (find)
 import Data.Array
-import Data.Sequence hiding (length)
+import Data.Maybe (maybe)
 import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Reader
-import Control.Monad.Writer hiding (Sum)
-import Control.Monad.RWS hiding (Sum)
+import Conduit
 
 type Heap = Array Addr Int 
 type RuntimeState = (ProgramState, Heap, Addr)
-type Program = RWST Int (Seq Int, Seq String) RuntimeState (Either String)
+type Computer = ConduitT Int Int (Either String) ()
+type Program = StateT RuntimeState (ConduitT Int Int (Either String))
 type ParamReader = Int -> Param
 
 newtype Addr = Addr Int deriving (Show, Eq, Ord, Ix)
-
-debug :: Bool
-debug = False
 
 data Op
   = Sum Param Param Addr
@@ -57,10 +53,15 @@ noOp :: Program ()
 noOp = return ()
 
 output :: Int -> Program ()
-output i = tell (singleton i, empty)
+output i = lift (yield i)
 
-trace :: Show a => a -> Program ()
-trace a = if debug then tell (empty, singleton (show a)) else noOp
+readInput :: Program Int
+readInput = do
+  mi <- lift await
+  maybe (throwError "Ran out of input values") return mi
+
+-- trace :: Show a => a -> Program ()
+-- trace a = if debug then tell (empty, singleton (show a)) else noOp
 
 setProgramCounter :: Addr -> Program ()
 setProgramCounter a = modify (\(ps, h, _) -> (ps, h , a))
@@ -98,7 +99,7 @@ isLt p1 p2 = (\a b -> a < b) <$> readParam p1 <*> readParam p2
 isEq p1 p2 = (\a b -> a == b) <$> readParam p1 <*> readParam p2
 
 run :: Op -> Program ()
-run op = trace op >> run' >> setPS (nextState op)
+run op = run' >> setPS (nextState op)
   where 
     nextState Halt = Stopped
     nextState _    = Reading
@@ -106,7 +107,7 @@ run op = trace op >> run' >> setPS (nextState op)
     run' = case op of 
       Sum ia ib io     -> binaryOp (+) ia ib io
       Mul ia ib io     -> binaryOp (*) ia ib io                      
-      ReadIn a         -> writeHeap a =<< ask
+      ReadIn a         -> writeHeap a =<< readInput
       WriteOut a       -> output =<< readParam a                       
       JumpIfTrue p a   -> branch (setProgramCounterFrom a) noOp  =<< test (/= 0) p
       JumpIfFalse p a  -> branch (setProgramCounterFrom a) noOp  =<< test (== 0) p
@@ -148,24 +149,31 @@ interpret opcode =
       99 -> return Halt
       i  -> throwError ("Unknown opcode: " <> (show i))
 
-runInterpreter :: Program Int
+runInterpreter :: Program ()
 runInterpreter = do
   (ps, _, _) <- get
   case ps of
     Reading    -> readNext >>= interpret >> runInterpreter
     Running op -> run op >> runInterpreter
-    Stopped    -> readHeap a0
+    Stopped    -> return ()
 
-runList :: Int -> [ Int ] -> Either String (Seq Int, Seq String)
-runList input startingHeap = 
+computer :: [ Int ] -> Computer
+computer startingHeap = 
   let initState = (Reading, listArray (Addr 0, Addr (length startingHeap)) startingHeap, a0)
-  in  snd <$> evalRWST runInterpreter input initState
+  in evalStateT runInterpreter initState
 
-ex1 :: IO (Either String (Seq Int, Seq String))
-ex1 = runFile "data/day05/0501.txt" parser (runList 1)
+runComputer :: [ Int ] -> [ Int ] -> Either String [ Int ]
+runComputer input heap = runConduit
+  (  yieldMany input
+  .| computer heap
+  .| sinkList
+  )
 
-ex2 :: IO (Either String (Seq Int, Seq String))
-ex2 = runFile "data/day05/0501.txt" parser (runList 5)
+ex1 :: IO (Either String [ Int ])
+ex1 = runFile "data/day05/0501.txt" parser (runComputer [ 1 ])
+
+ex2 :: IO (Either String [ Int ])
+ex2 = runFile "data/day05/0501.txt" parser (runComputer [ 5 ])
 
 parser :: AP.Parser [ Int ]
 parser = commaSeparated (AP.signed AP.decimal)
