@@ -55,7 +55,7 @@ noOp = return ()
 output :: Monad m => Int -> Program m ()
 output i = lift (yield i)
 
-readInput :: Monad m => (MonadError String) m => Program m Int
+readInput :: Monad m => MonadError String m => Program m Int
 readInput = do
   mi <- lift await
   maybe (throwError "Ran out of input values") return mi
@@ -95,7 +95,7 @@ isLt, isEq :: Param -> Param -> Program m Bool
 isLt p1 p2 = (\a b -> a < b) <$> readParam p1 <*> readParam p2
 isEq p1 p2 = (\a b -> a == b) <$> readParam p1 <*> readParam p2
 
-run :: (MonadError String) m => Op -> Program m ()
+run :: MonadError String m => Op -> Program m ()
 run op = run' >> setPS (nextState op)
   where 
     nextState Halt = Stopped
@@ -118,14 +118,14 @@ parseOpcode opcode =
     parseParam 0 = return (Ref . Addr)
     parseParam 1 = return Immediate
     parseParam i = throwError ("Bad param designator: " <> (show i))
-    digitAt d n = opcode `div` ((10 ^ d)) `mod` (10 ^ n)
+    digitsAt d n = opcode `div` ((10 ^ d)) `mod` (10 ^ n)
   in 
-    (,,,) <$> (parseParam (digitAt 2 1)) 
-          <*> (parseParam (digitAt 3 1)) 
-          <*> (parseParam (digitAt 4 1))
-          <*> (return (digitAt 0 2))
+    (,,,) <$> (parseParam (digitsAt 2 1)) 
+          <*> (parseParam (digitsAt 3 1)) 
+          <*> (parseParam (digitsAt 4 1))
+          <*> (return (digitsAt 0 2))
 
-interpret :: (MonadError String) m => Int -> Program m()
+interpret :: MonadError String m => Int -> Program m()
 interpret opcode =
   let
     readNext3 f  = f <$> readNext <*> readNext <*> readNext
@@ -146,7 +146,7 @@ interpret opcode =
       99 -> return Halt
       i  -> throwError ("Unknown opcode: " <> (show i))
 
-runInterpreter :: (MonadError String) m => Program m ()
+runInterpreter :: MonadError String m => Program m ()
 runInterpreter = do
   (ps, _, _) <- get
   case ps of
@@ -154,7 +154,7 @@ runInterpreter = do
     Running op -> run op >> runInterpreter
     Stopped    -> return ()
 
-computer :: (MonadError String) m => [ Int ] -> Computer m ()
+computer :: MonadError String m => [ Int ] -> Computer m ()
 computer startingHeap = 
   let initState = (Reading, listArray (Addr 0, Addr (length startingHeap)) startingHeap, a0)
   in evalStateT runInterpreter initState

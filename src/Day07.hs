@@ -14,7 +14,7 @@ import Control.Concurrent.MVar
 prepend :: Monad m => Int -> ConduitT Int Int m ()
 prepend i = yield i >> CC.map id
 
-amplifierChain :: Monad m => (MonadError String) m => [ Int ] -> (Int, Int, Int, Int, Int) -> Computer m ()
+amplifierChain :: Monad m => MonadError String m => [ Int ] -> (Int, Int, Int, Int, Int) -> Computer m ()
 amplifierChain heap (pa, pb, pc, pd, pe)
   =  prepend pa
   .| computer heap
