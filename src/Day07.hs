@@ -42,6 +42,9 @@ possibilities phases = do
   e <- es
   return (a, b, c, d, e)
 
+-- Hook the output of the computer to an MVar that feeds the result back into
+-- the input. This only works because the loop is always one in -> one out.
+
 feedbackSource :: MonadIO m => MVar Int -> ConduitT () Int m ()
 feedbackSource mv = do
   v <- liftIO (tryTakeMVar mv)
