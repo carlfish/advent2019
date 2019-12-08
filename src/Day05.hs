@@ -14,8 +14,8 @@ import Conduit
 
 type Heap = Array Addr Int 
 type RuntimeState = (ProgramState, Heap, Addr)
-type Computer a = ConduitT Int Int (Either String) a
-type Program = StateT RuntimeState (ConduitT Int Int (Either String))
+type Computer m a = ConduitT Int Int m a
+type Program m = StateT RuntimeState (ConduitT Int Int m)
 type ParamReader = Int -> Param
 
 newtype Addr = Addr Int deriving (Show, Eq, Ord, Ix)
@@ -49,56 +49,53 @@ a0 = Addr 0
 incAddr :: Addr -> Addr
 incAddr (Addr c) = Addr (c + 1)
 
-noOp :: Program ()
+noOp :: Program m ()
 noOp = return ()
 
-output :: Int -> Program ()
+output :: Monad m => Int -> Program m ()
 output i = lift (yield i)
 
-readInput :: Program Int
+readInput :: Monad m => (MonadError String) m => Program m Int
 readInput = do
   mi <- lift await
   maybe (throwError "Ran out of input values") return mi
 
--- trace :: Show a => a -> Program ()
--- trace a = if debug then tell (empty, singleton (show a)) else noOp
-
-setProgramCounter :: Addr -> Program ()
+setProgramCounter :: Addr -> Program m ()
 setProgramCounter a = modify (\(ps, h, _) -> (ps, h , a))
 
-setProgramCounterFrom :: Param -> Program()
+setProgramCounterFrom :: Param -> Program m ()
 setProgramCounterFrom p = setProgramCounter =<< (Addr <$> readParam p)
 
-setPS :: ProgramState -> Program ()
+setPS :: ProgramState -> Program m ()
 setPS ps = modify (\(_, h, c) -> (ps, h, c))
 
-writeHeap :: Addr -> Int -> Program ()
+writeHeap :: Addr -> Int -> Program m ()
 writeHeap a v = modify (\(ps, h, c) -> (ps, h // [(a, v)], c))
 
-readHeap :: Addr -> Program Int
+readHeap :: Addr -> Program m Int
 readHeap a = gets (\(ps, h, c) -> h ! a)
 
-readParam :: Param -> Program Int
+readParam :: Param -> Program m Int
 readParam (Immediate i) = return i
 readParam (Ref a)       = readHeap a
 
-readNext :: Program Int
+readNext :: Program m Int
 readNext = state (\(ps, h, c) -> (h ! c, (ps, h, incAddr c)))
 
-binaryOp :: (Int -> Int -> Int) -> Param -> Param -> Addr -> Program ()
+binaryOp :: (Int -> Int -> Int) -> Param -> Param -> Addr -> Program m ()
 binaryOp f ia ib io = writeHeap io =<< (f <$> readParam ia <*> readParam ib)
 
 branch :: a -> a -> Bool -> a
 branch ifTrue ifFalse condition = if condition then ifTrue else ifFalse
 
-test :: (Int -> Bool) -> Param -> Program Bool
+test :: (Int -> Bool) -> Param -> Program m Bool
 test f p = f <$> readParam p
 
-isLt, isEq :: Param -> Param -> Program Bool
+isLt, isEq :: Param -> Param -> Program m Bool
 isLt p1 p2 = (\a b -> a < b) <$> readParam p1 <*> readParam p2
 isEq p1 p2 = (\a b -> a == b) <$> readParam p1 <*> readParam p2
 
-run :: Op -> Program ()
+run :: (MonadError String) m => Op -> Program m ()
 run op = run' >> setPS (nextState op)
   where 
     nextState Halt = Stopped
@@ -128,7 +125,7 @@ parseOpcode opcode =
           <*> (parseParam (digitAt 4 1))
           <*> (return (digitAt 0 2))
 
-interpret :: Int -> Program ()
+interpret :: (MonadError String) m => Int -> Program m()
 interpret opcode =
   let
     readNext3 f  = f <$> readNext <*> readNext <*> readNext
@@ -149,7 +146,7 @@ interpret opcode =
       99 -> return Halt
       i  -> throwError ("Unknown opcode: " <> (show i))
 
-runInterpreter :: Program ()
+runInterpreter :: (MonadError String) m => Program m ()
 runInterpreter = do
   (ps, _, _) <- get
   case ps of
@@ -157,23 +154,23 @@ runInterpreter = do
     Running op -> run op >> runInterpreter
     Stopped    -> return ()
 
-computer :: [ Int ] -> Computer ()
+computer :: (MonadError String) m => [ Int ] -> Computer m ()
 computer startingHeap = 
   let initState = (Reading, listArray (Addr 0, Addr (length startingHeap)) startingHeap, a0)
   in evalStateT runInterpreter initState
 
-runComputer :: [ Int ] -> [ Int ] -> Either String [ Int ]
-runComputer input heap = runConduit
+runComputerPure :: [ Int ] -> Computer (Either String) () -> Either String [ Int ]
+runComputerPure input c = runConduit
   (  yieldMany input
-  .| computer heap
+  .| c
   .| sinkList
   )
 
 ex1 :: IO (Either String [ Int ])
-ex1 = runFile "data/day05/0501.txt" parser (runComputer [ 1 ])
+ex1 = runFile "data/day05/0501.txt" parser (runComputerPure [ 1 ] . computer)
 
 ex2 :: IO (Either String [ Int ])
-ex2 = runFile "data/day05/0501.txt" parser (runComputer [ 5 ])
+ex2 = runFile "data/day05/0501.txt" parser (runComputerPure [ 5 ] . computer)
 
 parser :: AP.Parser [ Int ]
 parser = commaSeparated (AP.signed AP.decimal)
