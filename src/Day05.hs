@@ -14,7 +14,7 @@ import Conduit
 
 type Heap = Array Addr Int 
 type RuntimeState = (ProgramState, Heap, Addr)
-type Computer = ConduitT Int Int (Either String) ()
+type Computer a = ConduitT Int Int (Either String) a
 type Program = StateT RuntimeState (ConduitT Int Int (Either String))
 type ParamReader = Int -> Param
 
@@ -157,7 +157,7 @@ runInterpreter = do
     Running op -> run op >> runInterpreter
     Stopped    -> return ()
 
-computer :: [ Int ] -> Computer
+computer :: [ Int ] -> Computer ()
 computer startingHeap = 
   let initState = (Reading, listArray (Addr 0, Addr (length startingHeap)) startingHeap, a0)
   in evalStateT runInterpreter initState
