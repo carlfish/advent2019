@@ -27,9 +27,6 @@ amplifierChain heap (pa, pb, pc, pd, pe)
   .| prepend pe
   .| computer heap
 
-phases :: [ Int ]
-phases = [0 .. 4]
-
 -- I'm sure there's a clever combo of library functions that does this. Probably
 -- involving 'tails'
 possibilities :: [ Int ] -> [ (Int, Int, Int, Int, Int) ]
@@ -64,6 +61,9 @@ runComputerFeedback input c = do
   rv <- lift (tryTakeMVar mv)
   maybe (throwError "No final value to return") return rv
 
+-- Calculate max thrust. These are more complicated than they need to be because I want to also return the input parameters
+-- that generated the max.
+
 highestThrust :: [ Int ] -> Either String ((Int, Int, Int, Int, Int), Int)
 highestThrust heap = (\r -> foldl (\(ap, a) (bp, b:bs) -> if (a > b) then (ap, a) else (bp, b)) ((0, 0, 0, 0, 0), 0) r) <$> runComputers
   where runComputers = (zip (possibilities [0..4])) <$> (sequence (runComputerPure [0] <$> amplifierChain heap <$> possibilities [0..4]))
@@ -72,11 +72,7 @@ highestThrustFeedback :: [ Int ] -> IO (Either String ((Int, Int, Int, Int, Int)
 highestThrustFeedback heap = runExceptT $ (\r -> foldl (\(ap, a) (bp, b) -> if (a > b) then (ap, a) else (bp, b)) ((0, 0, 0, 0, 0), 0) r) <$> runComputers
   where runComputers = (zip (possibilities [5..9])) <$> (sequence (runComputerFeedback 0 <$> amplifierChain heap <$> possibilities [5..9]))
 
-thrustFor :: (Int, Int, Int, Int, Int) -> [ Int ] -> Either String [ Int ]
-thrustFor ps heap = runComputerPure [0] (amplifierChain heap ps)
-
-thrustForFeedback :: (Int, Int, Int, Int, Int) -> [ Int ] -> IO (Either String Int)
-thrustForFeedback ps heap = runExceptT $ runComputerFeedback 0 (amplifierChain heap ps)
+-- Run the exercises
 
 ex1 :: IO (Either String ((Int, Int, Int, Int, Int), Int))
 ex1 = runFile "data/day07/0701.txt" parser highestThrust
@@ -84,5 +80,13 @@ ex1 = runFile "data/day07/0701.txt" parser highestThrust
 ex2 :: IO (Either String ((Int, Int, Int, Int, Int), Int))
 ex2 = runFileIO "data/day07/0701.txt" parser highestThrustFeedback
 
+-- Debugging functions
+
 tst1 :: IO (Either String ((Int, Int, Int, Int, Int), Int))
 tst1 = runFile "data/day07/07tst1.txt" parser highestThrust
+
+thrustFor :: (Int, Int, Int, Int, Int) -> [ Int ] -> Either String [ Int ]
+thrustFor ps heap = runComputerPure [0] (amplifierChain heap ps)
+
+thrustForFeedback :: (Int, Int, Int, Int, Int) -> [ Int ] -> IO (Either String Int)
+thrustForFeedback ps heap = runExceptT $ runComputerFeedback 0 (amplifierChain heap ps)
