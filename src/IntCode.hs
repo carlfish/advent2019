@@ -20,10 +20,10 @@ import Conduit
 import Data.Int (Int64(..))
 import Data.Vector.Unboxed (Vector, (//), (!), fromList)
 
-
 type MWord = Int64
 type Heap = Vector MWord 
 newtype Addr = Addr Int deriving (Show, Eq, Ord)
+
 type Computer m a = ConduitT MWord MWord m a
 type Program m = StateT RuntimeState (ConduitT MWord MWord m)
 type ParamReader = MWord -> Param
@@ -35,6 +35,11 @@ data RuntimeState = RuntimeState
   , relativeBase :: MWord 
   }
 
+data InterpreterState 
+  = Reading
+  | Running Op
+  | Stopped
+  deriving (Show)
 
 data Op
   = Sum Param Param Param
@@ -49,17 +54,13 @@ data Op
   | Halt
   deriving (Show)
 
-data InterpreterState 
-  = Reading
-  | Running Op
-  | Stopped
-  deriving (Show)
-
 data Param 
   = Immediate MWord 
   | Ref Addr
   | RelRef MWord
   deriving (Show)
+
+-- Dealing with addresses and words
 
 intToWord :: Int -> MWord
 intToWord = fromInteger . toInteger
@@ -70,14 +71,13 @@ wordToInt = fromInteger . toInteger
 truncateAddr :: MWord -> Addr
 truncateAddr = Addr . wordToInt
 
-addrVal :: Addr -> Int
-addrVal (Addr i) = i
-
-a0 :: Addr
-a0 = Addr 0
-  
+addrToInt :: Addr -> Int
+addrToInt (Addr i) = i
+ 
 incAddr :: Addr -> Addr
 incAddr (Addr c) = Addr (c + 1)
+
+-- Pieces of programs
 
 noOp :: Program m ()
 noOp = return ()
@@ -124,7 +124,7 @@ writeAtParam (RelRef i)    v = (\offset -> writeHeap (truncateAddr (i + offset))
 readNext :: Program m MWord
 readNext = state 
   (\s -> 
-    ( (heap s) ! ((addrVal . instructionPointer) s)
+    ( (heap s) ! ((addrToInt . instructionPointer) s)
     , s { instructionPointer = incAddr (instructionPointer s) }
     )
   )
@@ -141,6 +141,8 @@ test f p = f <$> readParam p
 isLt, isEq :: Param -> Param -> Program m Bool
 isLt p1 p2 = (\a b -> a < b) <$> readParam p1 <*> readParam p2
 isEq p1 p2 = (\a b -> a == b) <$> readParam p1 <*> readParam p2
+
+-- The guts of the interpreter
 
 run :: MonadError String m => Op -> Program m ()
 run op = run' >> setIS (nextState op)
@@ -204,13 +206,15 @@ runInterpreter = do
     Running op -> run op >> runInterpreter
     Stopped    -> return ()
 
+-- Frameworks for running code through the interpreter
+
 computer :: MonadError String m => Vector MWord -> Computer m ()
 computer startingHeap = 
   let 
     initState = RuntimeState 
       { interpreterState = Reading
       , heap = startingHeap 
-      , instructionPointer = a0
+      , instructionPointer = (Addr 0)
       , relativeBase = 0
       }
   in 
@@ -232,6 +236,8 @@ runComputerPure input c = runConduit
   .| c
   .| sinkList
   )
+
+-- Parsing programs from input files
 
 parser :: AP.Parser [ MWord ]
 parser = commaSeparated (AP.signed AP.decimal)
