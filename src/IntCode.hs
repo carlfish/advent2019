@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 module IntCode 
   ( Computer
   , MWord
