@@ -2,7 +2,7 @@
 
 module Day07 where
 
-import IntCode (Computer, MWord, computer, parser, runComputerPure)
+import IntCode (Computer, MWord, smallComputer, parser, runComputerPure)
 
 import Lib (runFile, runFileIO, maximumWith)
 import Conduit
@@ -17,15 +17,15 @@ prepend i = yield i >> CC.map id
 amplifierChain :: Monad m => MonadError String m => [ MWord ] -> (MWord, MWord, MWord, MWord, MWord) -> Computer m ()
 amplifierChain heap (pa, pb, pc, pd, pe)
   =  prepend pa
-  .| computer heap
+  .| smallComputer heap
   .| prepend pb
-  .| computer heap
+  .| smallComputer heap
   .| prepend pc
-  .| computer heap
+  .| smallComputer heap
   .| prepend pd
-  .| computer heap
+  .| smallComputer heap
   .| prepend pe
-  .| computer heap
+  .| smallComputer heap
 
 -- I'm sure there's a clever combo of library functions that does this. Probably
 -- involving 'tails'
