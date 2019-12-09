@@ -1,5 +1,6 @@
 -- All of the interesting coding for this day's task was done in the
--- IntCode module, specifically adding the 09 opcode and offset addressing.
+-- IntCode module, specifically adding the 09 opcode, offset addressing,
+-- and moving to 64 bit words and larger memory allocation.
 
 module Day09 where
 
