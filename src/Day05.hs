@@ -1,4 +1,6 @@
-{-# LANGUAGE FlexibleContexts #-}
+-- Most of the functionality was moved into the IntCode module
+-- to share with future days' problems. To see the original
+-- solution you'll have to look back in the file history.
 
 module Day05 where
 

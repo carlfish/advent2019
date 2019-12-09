@@ -86,9 +86,7 @@ output :: Monad m => MWord -> Program m ()
 output i = lift (yield i)
 
 readInput :: Monad m => MonadError String m => Program m MWord
-readInput = do
-  mi <- lift await
-  maybe (throwError "Ran out of input values") return mi
+readInput = maybe (throwError "Ran out of input values") return =<< lift await
 
 setInstructionPointer :: Addr -> Program m ()
 setInstructionPointer a = modify (\s -> s{ instructionPointer = a})
@@ -151,16 +149,16 @@ run op = run' >> setIS (nextState op)
     nextState _    = Reading
 
     run' = case op of 
-      Sum ia ib io     -> binaryOp (+) ia ib io
-      Mul ia ib io     -> binaryOp (*) ia ib io                      
-      ReadIn a         -> writeAtParam a =<< readInput
-      WriteOut a       -> output =<< readParam a                       
-      JumpIfTrue p a   -> branch (setInstructionPointerFrom a) noOp  =<< test (/= 0) p
-      JumpIfFalse p a  -> branch (setInstructionPointerFrom a) noOp  =<< test (== 0) p
+      Sum ia ib io      -> binaryOp (+) ia ib io
+      Mul ia ib io      -> binaryOp (*) ia ib io                      
+      ReadIn a          -> writeAtParam a =<< readInput
+      WriteOut a        -> output =<< readParam a                       
+      JumpIfTrue p a    -> branch (setInstructionPointerFrom a) noOp  =<< test (/= 0) p
+      JumpIfFalse p a   -> branch (setInstructionPointerFrom a) noOp  =<< test (== 0) p
       LessThan p1 p2 p3 -> branch (writeAtParam p3 1) (writeAtParam p3 0) =<< isLt p1 p2
       Equals p1 p2 p3   -> branch (writeAtParam p3 1) (writeAtParam p3 0) =<< isEq p1 p2
-      AdjustRelBase p1 -> modifyRelativeBase =<< readParam p1
-      Halt             -> noOp
+      AdjustRelBase p1  -> modifyRelativeBase =<< readParam p1
+      Halt              -> noOp
 
 parseOpcode :: MonadError String m => MWord -> m (ParamReader, ParamReader, ParamReader, MWord)
 parseOpcode opcode = 

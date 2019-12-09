@@ -1,5 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 
+-- A lot of the important code for this day was done in the IntCode
+-- module, specifically updating it to use Conduit for IO.
+
 module Day07 where
 
 import IntCode (Computer, MWord, smallComputer, parser, runComputerPure)

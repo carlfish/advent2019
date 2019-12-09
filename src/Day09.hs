@@ -1,4 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
+-- All of the interesting coding for this day's task was done in the
+-- IntCode module, specifically adding the 09 opcode and offset addressing.
 
 module Day09 where
 
