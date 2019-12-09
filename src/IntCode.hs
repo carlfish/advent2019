@@ -82,6 +82,9 @@ incAddr (Addr c) = Addr (c + 1)
 noOp :: Program m ()
 noOp = return ()
 
+raiseError :: MonadState RuntimeState m => MonadError String m => String -> m a
+raiseError e = (\is-> throwError (e <> " Last state: " <> (show is))) =<< gets interpreterState
+
 output :: Monad m => MWord -> Program m ()
 output i = lift (yield i)
 
@@ -91,7 +94,7 @@ readInput = maybe (throwError "Ran out of input values") return =<< lift await
 setInstructionPointer :: Addr -> Program m ()
 setInstructionPointer a = modify (\s -> s{ instructionPointer = a})
 
-setInstructionPointerFrom :: Param -> Program m ()
+setInstructionPointerFrom :: MonadError String m => Param -> Program m ()
 setInstructionPointerFrom p = setInstructionPointer =<< (truncateAddr <$> readParam p)
 
 setIS :: InterpreterState -> Program m ()
@@ -103,19 +106,27 @@ getRelativeBase = gets relativeBase
 modifyRelativeBase :: MWord -> Program m ()
 modifyRelativeBase m = modify (\s -> s { relativeBase = (relativeBase s) + m })
 
-writeHeap :: Addr -> MWord -> Program m ()
-writeHeap (Addr a) v = if a < 0 then undefined else  modify (\s -> s { heap = (heap s) // [(a, v)] })
+writeHeap :: MonadError String m => Addr -> MWord -> Program m ()
+writeHeap (Addr a) v = 
+  if a < 0 then 
+    raiseError ("Tried to write to negative address " <> (show a))
+  else 
+    modify (\s -> s { heap = (heap s) // [(a, v)] })
 
-readHeap :: Addr -> Program m MWord
-readHeap (Addr a) = if a < 0 then undefined else gets (\s -> (heap s) ! a)
+readHeap :: MonadError String m => Addr -> Program m MWord
+readHeap (Addr a) = 
+  if a < 0 then 
+    raiseError ("Tried to read from negative address " <> (show a))
+  else 
+    gets (\s -> (heap s) ! a)
 
-readParam :: Param -> Program m MWord
+readParam :: MonadError String m => Param -> Program m MWord
 readParam (Immediate i) = return i
 readParam (Ref a)       = readHeap a
 readParam (RelRef i)    = (\offset -> readHeap (truncateAddr (i + offset))) =<< getRelativeBase
 
-writeAtParam :: Param -> MWord -> Program m ()
-writeAtParam (Immediate i) v = undefined
+writeAtParam :: MonadError String m => Param -> MWord -> Program m ()
+writeAtParam (Immediate i) v = raiseError "Unsupported immediate param mode on write"
 writeAtParam (Ref a)       v = writeHeap a v
 writeAtParam (RelRef i)    v = (\offset -> writeHeap (truncateAddr (i + offset)) v) =<< getRelativeBase
 
@@ -127,16 +138,16 @@ readNext = state
     )
   )
   
-binaryOp :: (MWord -> MWord -> MWord) -> Param -> Param -> Param -> Program m ()
+binaryOp :: MonadError String m => (MWord -> MWord -> MWord) -> Param -> Param -> Param -> Program m ()
 binaryOp f ia ib io = writeAtParam io =<< (f <$> readParam ia <*> readParam ib)
 
 branch :: a -> a -> Bool -> a
 branch ifTrue ifFalse condition = if condition then ifTrue else ifFalse
 
-test :: (MWord -> Bool) -> Param -> Program m Bool
+test :: MonadError String m => (MWord -> Bool) -> Param -> Program m Bool
 test f p = f <$> readParam p
 
-isLt, isEq :: Param -> Param -> Program m Bool
+isLt, isEq :: MonadError String m => Param -> Param -> Program m Bool
 isLt p1 p2 = (\a b -> a < b) <$> readParam p1 <*> readParam p2
 isEq p1 p2 = (\a b -> a == b) <$> readParam p1 <*> readParam p2
 
@@ -160,13 +171,13 @@ run op = run' >> setIS (nextState op)
       AdjustRelBase p1  -> modifyRelativeBase =<< readParam p1
       Halt              -> noOp
 
-parseOpcode :: MonadError String m => MWord -> m (ParamReader, ParamReader, ParamReader, MWord)
+parseOpcode :: MonadError String m => MWord -> Program m (ParamReader, ParamReader, ParamReader, MWord)
 parseOpcode opcode = 
   let
     parseParam 0 = return (Ref . truncateAddr)
     parseParam 1 = return Immediate
     parseParam 2 = return RelRef
-    parseParam i = throwError ("Bad param designator: " <> (show i))
+    parseParam i = raiseError ("Bad param designator: " <> (show i))
     digitsAt d n = opcode `div` ((10 ^ d)) `mod` (10 ^ n)
   in 
     (,,,) <$> (parseParam (digitsAt 2 1)) 
@@ -194,7 +205,7 @@ interpret opcode =
       8  -> readNext3 (intToParam3 p1 p2 p3 Equals)
       9  -> AdjustRelBase <$> p1 <$> readNext
       99 -> return Halt
-      i  -> throwError ("Unknown opcode: " <> (show i))
+      i  -> raiseError ("Unknown opcode: " <> (show i))
 
 runInterpreter :: MonadError String m => Program m ()
 runInterpreter = do
