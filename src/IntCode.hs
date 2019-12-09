@@ -204,39 +204,27 @@ runInterpreter = do
     Running op -> run op >> runInterpreter
     Stopped    -> return ()
 
--- Big Computer has a whole ten kilobytes (!) of RAM
--- Note that things being what they are, increasing the
--- total RAM of the computer reduces performance by orders
--- of magnitude, so if we want to build one with more memory
--- we're going to have to rip everything out and go with
--- mutable arrays.
-bigComputer :: MonadError String m => [ MWord ] -> Computer m ()
-bigComputer startingHeap = 
+computer :: MonadError String m => Vector MWord -> Computer m ()
+computer startingHeap = 
   let 
-    initHeap = V.replicate (10 * 1024) 0
-    loadProgram = initHeap // (zip [0..] startingHeap)
     initState = RuntimeState 
       { interpreterState = Reading
-      , heap = loadProgram 
+      , heap = startingHeap 
       , instructionPointer = a0
       , relativeBase = 0
       }
   in 
     evalStateT runInterpreter initState
 
+-- Big Computer has a whole ten kilobytes (!) of RAM
+-- Note that with immutable RAM, the total memory size has a HUGE impact on 
+-- performance, so anything larger and we'll need to look into mutable state.
+bigComputer :: MonadError String m => [ MWord ] -> Computer m ()
+bigComputer programCode = computer $ (V.replicate (10 * 1024) 0) // (zip [0..] programCode)
+
 -- Small computer only has as much RAM as is required to load its starting heap
 smallComputer :: MonadError String m => [ MWord ] -> Computer m ()
-smallComputer startingHeap = 
-  let 
-    initMem = fromList startingHeap
-    initState = RuntimeState 
-      { interpreterState = Reading
-      , heap = initMem 
-      , instructionPointer = a0
-      , relativeBase = 0
-      }
-  in 
-    evalStateT runInterpreter initState
+smallComputer programCode = computer (fromList programCode)
 
 runComputerPure :: [ MWord ] -> Computer (Either String) () -> Either String [ MWord ]
 runComputerPure input c = runConduit
