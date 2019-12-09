@@ -17,7 +17,7 @@ import Control.Concurrent.MVar
 prepend :: Monad m => MWord -> ConduitT MWord MWord m ()
 prepend i = yield i >> CC.map id
 
-amplifierChain :: Monad m => MonadError String m => [ MWord ] -> (MWord, MWord, MWord, MWord, MWord) -> Computer m ()
+amplifierChain :: Monad m => [ MWord ] -> (MWord, MWord, MWord, MWord, MWord) -> Computer m ()
 amplifierChain heap (pa, pb, pc, pd, pe)
   =  prepend pa
   .| smallComputer heap
@@ -56,7 +56,7 @@ feedbackSource mv = do
 feedbackSink :: MonadIO m => MVar MWord -> ConduitT MWord Void m ()
 feedbackSink mv = awaitForever (liftIO . putMVar mv)
 
-runComputerFeedback :: MWord -> Computer (ExceptT String IO) () -> ExceptT String IO MWord
+runComputerFeedback :: MWord -> Computer IO () -> ExceptT String IO MWord
 runComputerFeedback input c = do
   mv <- lift (newMVar input)
   runConduit

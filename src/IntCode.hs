@@ -24,8 +24,8 @@ type MWord = Int64
 type Heap = Vector MWord 
 newtype Addr = Addr Int deriving (Show, Eq, Ord)
 
-type Computer m a = ConduitT MWord MWord m a
-type Program m = StateT RuntimeState (ConduitT MWord MWord m)
+type Computer m a = ConduitT MWord MWord (ExceptT String m) a
+type Program m = StateT RuntimeState (ConduitT MWord MWord (ExceptT String m))
 type ParamReader = MWord -> Param
 
 data RuntimeState = RuntimeState  
@@ -82,19 +82,19 @@ incAddr (Addr c) = Addr (c + 1)
 noOp :: Program m ()
 noOp = return ()
 
-raiseError :: MonadState RuntimeState m => MonadError String m => String -> m a
-raiseError e = (\is-> throwError (e <> " Last state: " <> (show is))) =<< gets interpreterState
+raiseError :: Monad m => String -> Program m a
+raiseError e = (\is -> throwError (e <> " Last state: " <> (show is))) =<< gets interpreterState
 
 output :: Monad m => MWord -> Program m ()
 output i = lift (yield i)
 
-readInput :: Monad m => MonadError String m => Program m MWord
+readInput :: Monad m => Program m MWord
 readInput = maybe (throwError "Ran out of input values") return =<< lift await
 
 setInstructionPointer :: Addr -> Program m ()
 setInstructionPointer a = modify (\s -> s{ instructionPointer = a})
 
-setInstructionPointerFrom :: MonadError String m => Param -> Program m ()
+setInstructionPointerFrom :: Monad m => Param -> Program m ()
 setInstructionPointerFrom p = setInstructionPointer =<< (truncateAddr <$> readParam p)
 
 setIS :: InterpreterState -> Program m ()
@@ -106,26 +106,26 @@ getRelativeBase = gets relativeBase
 modifyRelativeBase :: MWord -> Program m ()
 modifyRelativeBase m = modify (\s -> s { relativeBase = (relativeBase s) + m })
 
-writeHeap :: MonadError String m => Addr -> MWord -> Program m ()
+writeHeap :: Monad m => Addr -> MWord -> Program m ()
 writeHeap (Addr a) v = 
   if a < 0 then 
     raiseError ("Tried to write to negative address " <> (show a))
   else 
     modify (\s -> s { heap = (heap s) // [(a, v)] })
 
-readHeap :: MonadError String m => Addr -> Program m MWord
+readHeap :: Monad m => Addr -> Program m MWord
 readHeap (Addr a) = 
   if a < 0 then 
     raiseError ("Tried to read from negative address " <> (show a))
   else 
     gets (\s -> (heap s) ! a)
 
-readParam :: MonadError String m => Param -> Program m MWord
+readParam :: Monad m => Param -> Program m MWord
 readParam (Immediate i) = return i
 readParam (Ref a)       = readHeap a
 readParam (RelRef i)    = (\offset -> readHeap (truncateAddr (i + offset))) =<< getRelativeBase
 
-writeAtParam :: MonadError String m => Param -> MWord -> Program m ()
+writeAtParam :: Monad m => Param -> MWord -> Program m ()
 writeAtParam (Immediate i) v = raiseError "Unsupported immediate param mode on write"
 writeAtParam (Ref a)       v = writeHeap a v
 writeAtParam (RelRef i)    v = (\offset -> writeHeap (truncateAddr (i + offset)) v) =<< getRelativeBase
@@ -138,22 +138,22 @@ readNext = state
     )
   )
   
-binaryOp :: MonadError String m => (MWord -> MWord -> MWord) -> Param -> Param -> Param -> Program m ()
+binaryOp :: Monad m => (MWord -> MWord -> MWord) -> Param -> Param -> Param -> Program m ()
 binaryOp f ia ib io = writeAtParam io =<< (f <$> readParam ia <*> readParam ib)
 
 branch :: a -> a -> Bool -> a
 branch ifTrue ifFalse condition = if condition then ifTrue else ifFalse
 
-test :: MonadError String m => (MWord -> Bool) -> Param -> Program m Bool
+test :: Monad m => (MWord -> Bool) -> Param -> Program m Bool
 test f p = f <$> readParam p
 
-isLt, isEq :: MonadError String m => Param -> Param -> Program m Bool
+isLt, isEq :: Monad m => Param -> Param -> Program m Bool
 isLt p1 p2 = (\a b -> a < b) <$> readParam p1 <*> readParam p2
 isEq p1 p2 = (\a b -> a == b) <$> readParam p1 <*> readParam p2
 
 -- The guts of the interpreter
 
-run :: MonadError String m => Op -> Program m ()
+run :: Monad m => Op -> Program m ()
 run op = run' >> setIS (nextState op)
   where 
     nextState Halt = Stopped
@@ -171,7 +171,7 @@ run op = run' >> setIS (nextState op)
       AdjustRelBase p1  -> modifyRelativeBase =<< readParam p1
       Halt              -> noOp
 
-parseOpcode :: MonadError String m => MWord -> Program m (ParamReader, ParamReader, ParamReader, MWord)
+parseOpcode :: Monad m => MWord -> Program m (ParamReader, ParamReader, ParamReader, MWord)
 parseOpcode opcode = 
   let
     parseParam 0 = return (Ref . truncateAddr)
@@ -185,7 +185,7 @@ parseOpcode opcode =
           <*> (parseParam (digitsAt 4 1))
           <*> (return (digitsAt 0 2))
 
-interpret :: MonadError String m => MWord -> Program m()
+interpret :: Monad m => MWord -> Program m ()
 interpret opcode =
   let
     readNext3 f  = f <$> readNext <*> readNext <*> readNext
@@ -207,7 +207,7 @@ interpret opcode =
       99 -> return Halt
       i  -> raiseError ("Unknown opcode: " <> (show i))
 
-runInterpreter :: MonadError String m => Program m ()
+runInterpreter :: Monad m => Program m ()
 runInterpreter = do
   is <- gets interpreterState
   case is of
@@ -217,7 +217,7 @@ runInterpreter = do
 
 -- Frameworks for running code through the interpreter
 
-computer :: MonadError String m => Vector MWord -> Computer m ()
+computer :: Monad m => Vector MWord -> Computer m ()
 computer startingHeap = 
   let 
     initState = RuntimeState 
@@ -232,15 +232,15 @@ computer startingHeap =
 -- Big Computer has a whole ten kilobytes (!) of RAM
 -- Note that with immutable RAM, the total memory size has a HUGE impact on 
 -- performance, so anything larger and we'll need to look into mutable state.
-bigComputer :: MonadError String m => [ MWord ] -> Computer m ()
+bigComputer :: Monad m => [ MWord ] -> Computer m ()
 bigComputer programCode = computer $ (V.replicate (10 * 1024) 0) // (zip [0..] programCode)
 
 -- Small computer only has as much RAM as is required to load its starting heap
-smallComputer :: MonadError String m => [ MWord ] -> Computer m ()
+smallComputer :: Monad m => [ MWord ] -> Computer m ()
 smallComputer programCode = computer (fromList programCode)
 
-runComputerPure :: [ MWord ] -> Computer (Either String) () -> Either String [ MWord ]
-runComputerPure input c = runConduit
+runComputerPure :: [ MWord ] -> Computer Identity () -> Either String [ MWord ]
+runComputerPure input c = runIdentity $ runExceptT $ runConduit
   (  yieldMany input
   .| c
   .| sinkList
