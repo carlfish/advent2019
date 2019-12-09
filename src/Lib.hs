@@ -5,6 +5,8 @@ module Lib
     , runFile
     , runFile'
     , runFileIO
+    , minimumWith
+    , maximumWith
     ) where
 
 import qualified Data.Attoparsec.ByteString.Char8 as AP
@@ -13,6 +15,18 @@ import Data.Attoparsec.ByteString.Char8 (Parser)
 import System.IO (openFile, IOMode(..))
 import Data.ByteString (hGetContents)
 import Data.Either (either)
+import Data.Foldable (minimumBy, maximumBy)
+
+-- Helpers
+
+minimumWith :: Foldable f => Ord b => (a -> b) -> f a -> a
+minimumWith f = minimumBy (\a1 a2 -> f a1 `compare` f a2)
+
+maximumWith :: Foldable f => Ord b => (a -> b) -> f a -> a
+maximumWith f = maximumBy (\a1 a2 -> f a1 `compare` f a2)
+
+
+-- Parsers
 
 onePerLine :: Parser a ->Parser [ a ]
 onePerLine p = AP.many' (p <* AP.choice [AP.endOfLine, AP.endOfInput])
@@ -26,6 +40,8 @@ parseFile file parser = do
   contents <- hGetContents handle
   return $ AP.parseOnly parser contents
   
+-- Exercise runners
+
 runFileIO :: String -> Parser a -> (a -> IO (Either String b)) -> IO (Either String b)
 runFileIO file parser processor = do
   p <- parseFile file parser

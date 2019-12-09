@@ -4,7 +4,7 @@ module Day07 where
 
 import Day05 (Computer, computer, parser, runComputerPure)
 
-import Lib (runFile, runFileIO)
+import Lib (runFile, runFileIO, maximumWith)
 import Conduit
 import qualified Data.Conduit.Combinators as CC
 import Data.Either (either)
@@ -68,11 +68,11 @@ runComputerFeedback input c = do
 -- that generated the max.
 
 highestThrust :: [ Int ] -> Either String ((Int, Int, Int, Int, Int), Int)
-highestThrust heap = (\r -> foldl (\(ap, a) (bp, b:bs) -> if (a > b) then (ap, a) else (bp, b)) ((0, 0, 0, 0, 0), 0) r) <$> runComputers
-  where runComputers = (zip (possibilities [0..4])) <$> (sequence (runComputerPure [0] <$> amplifierChain heap <$> possibilities [0..4]))
+highestThrust heap = ((\r -> maximumWith snd r) <$> runComputers)
+  where runComputers = (zip (possibilities [0..4])) <$> sequence (fmap head <$> runComputerPure [0] <$> amplifierChain heap <$> possibilities [0..4])
   
 highestThrustFeedback :: [ Int ] -> IO (Either String ((Int, Int, Int, Int, Int), Int))
-highestThrustFeedback heap = runExceptT $ (\r -> foldl (\(ap, a) (bp, b) -> if (a > b) then (ap, a) else (bp, b)) ((0, 0, 0, 0, 0), 0) r) <$> runComputers
+highestThrustFeedback heap = runExceptT $ (\r -> maximumWith snd r) <$> runComputers
   where runComputers = (zip (possibilities [5..9])) <$> (sequence (runComputerFeedback 0 <$> amplifierChain heap <$> possibilities [5..9]))
 
 -- Run the exercises
