@@ -4,8 +4,6 @@
 
 module Day09 where
 
-import qualified Data.Attoparsec.ByteString.Char8 as AP
-
 import Lib (runFile, commaSeparated)
 import IntCode (MWord, parser, runComputerPure, bigComputer)
 

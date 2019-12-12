@@ -25,7 +25,6 @@ minimumWith f = minimumBy (\a1 a2 -> f a1 `compare` f a2)
 maximumWith :: Foldable f => Ord b => (a -> b) -> f a -> a
 maximumWith f = maximumBy (\a1 a2 -> f a1 `compare` f a2)
 
-
 -- Parsers
 
 onePerLine :: Parser a ->Parser [ a ]
