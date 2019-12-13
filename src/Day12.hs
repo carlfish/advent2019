@@ -66,22 +66,16 @@ dimensions :: (Body -> (Int, Int)) -> System -> [ (Int, Int) ]
 dimensions d = fmap d
 
 firstRepeatOnDimension :: (Body -> (Int, Int)) -> System -> Integer
-firstRepeatOnDimension d s = toInteger $ length prefix + length cycle
-  where
-    (prefix, cycle) = findCycle (dimensions d <$> ticks s) 
+firstRepeatOnDimension d s = toInteger $ findFirstRepeat (dimensions d <$> ticks s)
 
-findCycle :: Eq a => [ a ] -> ( [a], [a] )
-findCycle a = chase a a
-  where 
-    chase (t : ts) (_ : h : hs)  
-      | (t == h) = findStart a ts 
-      | otherwise = chase ts hs
-    findStart (t : ts) (h : hs)  
-      | (t == h) = ([], t : extractCycle t ts) 
-      | otherwise = let (as, bs) = findStart ts hs in (t:as, bs)
-    extractCycle x (y : ys)
-      | x == y = []
-      | otherwise = y : extractCycle x ys
+findFirstRepeat :: Eq a => [ a ] -> Integer
+findFirstRepeat [] = -1
+findFirstRepeat (a : as) = findNextRepeat 1 a as
+  where
+     findNextRepeat n x []       = -1
+     findNextRepeat n x (y : ys) 
+                    | x == y     = n
+                    | otherwise  = findNextRepeat (n + 1) x ys
 
 firstCycle :: System -> Integer
 firstCycle s = lcm firstXRepeat (lcm firstYRepeat firstZRepeat)
