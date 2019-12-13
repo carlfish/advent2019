@@ -68,6 +68,11 @@ dimensions d = fmap d
 firstRepeatOnDimension :: (Body -> (Int, Int)) -> System -> Integer
 firstRepeatOnDimension d s = toInteger $ findFirstRepeat (dimensions d <$> ticks s)
 
+-- I was previously doing a full cycle detection here, which (a) would have given
+-- wrong results if the cycle started after the first element, and (b) was redundant
+-- because mathematically, the cycle must start at the first element (because the
+-- simulation is reversible, therefore if there's a cycle, all states must be a part
+-- of it). Thanks reddit!
 findFirstRepeat :: Eq a => [ a ] -> Integer
 findFirstRepeat [] = -1
 findFirstRepeat (a : as) = findNextRepeat 1 a as
