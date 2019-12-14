@@ -121,7 +121,7 @@ dumpOutputToVMem c = (runIdentity . runExceptT)
     .| vmemSink
     )
   )
-  
+
 -- Assumption: the game ends itself when there are no more blocks
 joystickController :: MonadIO m => MVar MWord -> State -> ConduitT Update Void (ExceptT String m) State
 joystickController mv state =
@@ -133,7 +133,10 @@ joystickController mv state =
       maybe (return state)
             (\u -> playNextTurn (update u state))
         =<< await
-  
+
+setToFreeMode :: Monad m => Program m ()
+setToFreeMode = modifyMemory 0 2        
+
 -- Source that reads the value out of an MVar without consuming it (input is
 -- a queryable state rather than a sequence of values). It's up to the provider
 -- of the MVar to make sure there's always something in there.
@@ -142,10 +145,9 @@ fixedStateSource mv = do
   v <- liftIO (readMVar mv)
   yield v >> fixedStateSource mv
 
-
 runGameForScore :: Computer IO () -> IO (Either String MWord)
 runGameForScore c = runExceptT $ do
-  mv <- lift (newMVar 0)
+  mv <- lift (newMVar (joystickToMWord JoyNeutral))
   s  <- runConduit
         (  fixedStateSource mv
         .| c
@@ -153,9 +155,6 @@ runGameForScore c = runExceptT $ do
         .| joystickController mv newGame
         )
   return (score s)
-
-setToFreeMode :: Monad m => Program m ()
-setToFreeMode = modifyMemory 0 2
 
 -- exercises
 
