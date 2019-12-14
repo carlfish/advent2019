@@ -6,7 +6,7 @@ import Lib (runFileIO)
 import Data.Map.Strict (Map, findWithDefault, empty, insert, size, singleton, keys)
 import Control.Monad.Except
 import Data.Maybe (maybe)
-import IntCode (Computer, MWord, parser, bigComputer)
+import IntCode (Computer, MWord, parser, bigComputer, feedbackSource)
 import Conduit
 import Control.Concurrent.MVar
 
@@ -124,11 +124,6 @@ orderSink mv state =
             ( \o -> case processOrders o state of
                       newState -> liftIO (putMVar mv (colourToMWord (colourAtS newState))) >> orderSink mv newState)
         =<< await
-
-feedbackSource :: MonadIO m => MVar MWord -> ConduitT () MWord m ()
-feedbackSource mv = do
-  v <- liftIO (tryTakeMVar mv)
-  maybe (return ()) (\vv -> yield vv >> feedbackSource mv) v
 
 runRobotFromComputer :: State -> Computer IO () -> IO (Either String Hull)
 runRobotFromComputer is c = runExceptT $ do

@@ -1,10 +1,15 @@
 module IntCode 
   ( Computer
   , MWord
+  , Program
   , smallComputer
   , bigComputer
+  , bigComputer'
   , parser
   , runComputerPure
+  , wordToInt
+  , feedbackSource
+  , modifyMemory
   ) where
 
 import qualified Data.Attoparsec.ByteString.Char8 as AP
@@ -17,6 +22,7 @@ import Control.Monad.State
 import Conduit
 import Data.Int (Int64(..))
 import Data.Vector.Unboxed (Vector, (//), (!), fromList)
+import Control.Concurrent.MVar
 
 type MWord = Int64
 type Heap = Vector MWord 
@@ -215,8 +221,8 @@ runInterpreter = do
 
 -- Frameworks for running code through the interpreter
 
-computer :: Monad m => Vector MWord -> Computer m ()
-computer startingHeap = 
+computer :: Monad m => Program m () -> Vector MWord -> Computer m ()
+computer runFirst startingHeap = 
   let 
     initState = RuntimeState 
       { interpreterState = Reading
@@ -225,17 +231,20 @@ computer startingHeap =
       , relativeBase = 0
       }
   in 
-    evalStateT runInterpreter initState
+    evalStateT (runFirst >> runInterpreter) initState
 
 -- Big Computer has a whole ten kilobytes (!) of RAM
 -- Note that with immutable RAM, the total memory size has a HUGE impact on 
 -- performance, so anything larger and we'll need to look into mutable state.
 bigComputer :: Monad m => [ MWord ] -> Computer m ()
-bigComputer programCode = computer $ (V.replicate (10 * 1024) 0) // (zip [0..] programCode)
+bigComputer = bigComputer' noOp
+
+bigComputer' :: Monad m => Program m () -> [ MWord ] -> Computer m ()
+bigComputer' runFirst programCode = computer runFirst $ (V.replicate (10 * 1024) 0) // (zip [0..] programCode)
 
 -- Small computer only has as much RAM as is required to load its starting heap
 smallComputer :: Monad m => [ MWord ] -> Computer m ()
-smallComputer programCode = computer (fromList programCode)
+smallComputer programCode = computer noOp (fromList programCode)
 
 runComputerPure :: [ MWord ] -> Computer Identity () -> Either String [ MWord ]
 runComputerPure input c = runIdentity $ runExceptT $ runConduit
@@ -243,6 +252,20 @@ runComputerPure input c = runIdentity $ runExceptT $ runConduit
   .| c
   .| sinkList
   )
+
+-- Helpers
+
+-- Some programs want us to twiddle a bit in RAM before running them
+modifyMemory :: Monad m => MWord -> MWord -> Program m ()
+modifyMemory a b = writeHeap (truncateAddr a) b
+
+-- Simple MVar-backed way to send a single value from the output of
+-- the computer back to the input. Assumes that a single input value
+-- will always be sufficient to trigger the next one.
+feedbackSource :: MonadIO m => MVar MWord -> ConduitT () MWord m ()
+feedbackSource mv = do
+  v <- liftIO (tryTakeMVar mv)
+  maybe (return ()) (\vv -> yield vv >> feedbackSource mv) v
 
 -- Parsing programs from input files
 

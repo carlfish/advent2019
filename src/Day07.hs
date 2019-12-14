@@ -5,7 +5,7 @@
 
 module Day07 where
 
-import IntCode (Computer, MWord, smallComputer, parser, runComputerPure)
+import IntCode (Computer, MWord, smallComputer, parser, runComputerPure, feedbackSource)
 
 import Lib (runFile, runFileIO, maximumWith)
 import Conduit
@@ -47,11 +47,6 @@ possibilities phases = do
 
 -- Hook the output of the computer to an MVar that feeds the result back into
 -- the input. This only works because the loop is always one in -> one out.
-
-feedbackSource :: MonadIO m => MVar MWord -> ConduitT () MWord m ()
-feedbackSource mv = do
-  v <- liftIO (tryTakeMVar mv)
-  maybe (return ()) (\vv -> yield vv >> feedbackSource mv) v
 
 feedbackSink :: MonadIO m => MVar MWord -> ConduitT MWord Void m ()
 feedbackSink mv = awaitForever (liftIO . putMVar mv)
