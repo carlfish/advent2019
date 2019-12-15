@@ -262,7 +262,7 @@ modifyMemory a b = writeHeap (truncateAddr a) b
 -- Simple MVar-backed way to send a single value from the output of
 -- the computer back to the input. Assumes that a single input value
 -- will always be sufficient to trigger the next one.
-feedbackSource :: MonadIO m => MVar MWord -> ConduitT () MWord m ()
+feedbackSource :: MonadIO m => MVar o -> ConduitT () o m ()
 feedbackSource mv = do
   v <- liftIO (tryTakeMVar mv)
   maybe (return ()) (\vv -> yield vv >> feedbackSource mv) v

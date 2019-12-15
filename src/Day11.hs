@@ -118,18 +118,19 @@ orderInterpreter = awaitColour
             (const awaitColour <=< yield . Orders c <=< interpretRotation) 
         =<< await
 
-orderSink :: MonadIO m => MVar MWord -> State -> ConduitT Orders Void (ExceptT String m) Hull
+orderSink :: MonadIO m => MVar Colour -> State -> ConduitT Orders Void (ExceptT String m) Hull
 orderSink mv state =
       maybe (return (hull state))
             ( \o -> case processOrders o state of
-                      newState -> liftIO (putMVar mv (colourToMWord (colourAtS newState))) >> orderSink mv newState)
+                      newState -> liftIO (putMVar mv (colourAtS newState)) >> orderSink mv newState)
         =<< await
 
 runRobotFromComputer :: State -> Computer IO () -> IO (Either String Hull)
 runRobotFromComputer is c = runExceptT $ do
-  mv <- lift (newMVar (colourToMWord (colourAtS is)))
+  mv <- lift (newMVar (colourAtS is))
   runConduit
     (  feedbackSource mv
+    .| mapC colourToMWord
     .| c
     .| orderInterpreter
     .| orderSink mv is

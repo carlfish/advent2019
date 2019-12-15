@@ -50,9 +50,9 @@ joystickToMWord JoyLeft    = -1
 joystickToMWord JoyNeutral =  0
 joystickToMWord JoyRight   =  1
 
-update :: Update -> State -> State
-update (UpdateVMem c t) s = s { vmem = insert c t (vmem s) }
-update (UpdateScore score) s = s { score = score }
+update :: State -> Update -> State
+update s (UpdateVMem c t)    = s { vmem = insert c t (vmem s) }
+update s (UpdateScore score) = s { score = score }
 
 -- Game state calculations
 
@@ -70,6 +70,7 @@ paddleCentreX v = centerCoord (fst <$> (matchingTiles HPaddle v))
     centerCoord [] = Nothing 
     centerCoord xs = Just (div ((minimum xs) + (maximum xs)) 2)
 
+-- Keep the paddle in line with the ball.    
 calculateMove :: VMem -> Joystick
 calculateMove v = 
   let
@@ -107,10 +108,7 @@ updateCoalescer = readX
       =<< await
   
 vmemSink :: Monad m => ConduitT Update Void (ExceptT String m) VMem
-vmemSink = vmem <$> stateSink newGame 
-  where
-    stateSink s = maybe (return s) (\u -> stateSink (update u s))
-      =<< await
+vmemSink = vmem <$> foldlC update newGame 
 
 dumpOutputToVMem :: Computer Identity () -> Either String VMem
 dumpOutputToVMem c = (runIdentity . runExceptT) 
@@ -123,15 +121,15 @@ dumpOutputToVMem c = (runIdentity . runExceptT)
   )
 
 -- Assumption: the game ends itself when there are no more blocks
-joystickController :: MonadIO m => MVar MWord -> State -> ConduitT Update Void (ExceptT String m) State
+joystickController :: MonadIO m => MVar Joystick -> State -> ConduitT Update Void (ExceptT String m) State
 joystickController mv state =
   let
     playNextTurn newState = do
-      liftIO (swapMVar mv (joystickToMWord (calculateMove (vmem newState)))) 
+      liftIO (swapMVar mv (calculateMove (vmem newState))) 
       joystickController mv newState
   in
       maybe (return state)
-            (\u -> playNextTurn (update u state))
+            (playNextTurn . update state)
         =<< await
 
 setToFreeMode :: Monad m => Program m ()
@@ -140,16 +138,15 @@ setToFreeMode = modifyMemory 0 2
 -- Source that reads the value out of an MVar without consuming it (input is
 -- a queryable state rather than a sequence of values). It's up to the provider
 -- of the MVar to make sure there's always something in there.
-fixedStateSource :: MonadIO m => MVar MWord -> ConduitT () MWord m ()
-fixedStateSource mv = do
-  v <- liftIO (readMVar mv)
-  yield v >> fixedStateSource mv
+continuousStateSource :: MonadIO m => MVar o -> ConduitT () o m ()
+continuousStateSource mv = liftIO (readMVar mv) >>= yield >> continuousStateSource mv
 
 runGameForScore :: Computer IO () -> IO (Either String MWord)
 runGameForScore c = runExceptT $ do
-  mv <- lift (newMVar (joystickToMWord JoyNeutral))
+  mv <- lift (newMVar JoyNeutral)
   s  <- runConduit
-        (  fixedStateSource mv
+        ( continuousStateSource mv
+        .| mapC joystickToMWord
         .| c
         .| updateCoalescer
         .| joystickController mv newGame
